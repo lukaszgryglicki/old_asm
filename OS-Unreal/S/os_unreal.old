@@ -1,0 +1,223 @@
+.code16 
+.text
+    jmp kernel_entry 
+init_msg:
+       .asciz "Kernel loaded!\n\r"
+rm16_msg:
+	.asciz "Hello from RealMode 16bit!\n\r"
+rm16_again:
+	.asciz "In Real-Mode 16bit again!\n\r"
+check_unreal_done:
+	.asciz "After Hard-Trying to use UnReal mode!\n\r"
+will_try_unreal:
+	.asciz "Will try UnReal CPU mode, unsafe!!!\n\r"
+partial_prot:
+	.asciz "Partial PROT done, CR0 set!\n\r"
+code_32:
+	.ascii "C O D E   I S   3 2   B I T   B U T   A D D R E S S I N G   S T I L L   1 6   B I T "
+unreal_mode:
+	.asciz "Now in UnReal Mode!!!!!!!!!\n\r"
+now_in_prot:
+	.ascii "I N   P R O T E C T E D   M O D E !"
+unreal_color:
+	.ascii "T H I S   I S   W R I T T E N   I N   U N R E A L   M O D E"
+null_descriptor:
+gdtr:
+	.word gdt_end - gdt -1
+	.long gdt
+gdt:
+	.word 0,0
+	.byte 0,0,0,0
+#.set LINEAR_SEL, .-gdt					# 8 ?
+.set LINEAR_SEL,8
+	.word 0xffff,0
+	.byte 0,0x92,0xcf,0
+#.set SYS_CODE_SEL, .-gdt				# 16 ?
+.set SYS_CODE_SEL,16
+gdt2:
+	.word 0xffff,0
+	.byte 0,0x9a,0xcf,0
+#.set SYS_DATA_SEL, .-gdt				# 24 ?
+.set SYS_DATA_SEL,24
+gdt3:
+	.word 0xffff,0
+	.byte 0,0x92,0xcf,0
+#.set REAL_CODE_SEL, .-gdt				# 32 ?
+.set REAL_CODE_SEL,32
+gdt4:
+	.word 0xffff,0
+	.byte 0,0x9a,0,0
+#.set REAL_DATA_SEL, .-gdt				# 40 ?
+.set REAL_DATA_SEL,40
+gdt5:
+	.word 0xffff,0
+	.byte 0,0x92,0,0
+gdt_end:
+RealModeCS:
+	.word 0
+RealModeIP:
+	.word 0
+kernel_entry:
+       cli 
+       movw $0x7c0,%ax
+       movw %ax,%ds
+       movw %ax,%ss
+       movw $0x1000,%sp
+       sti
+       movw $init_msg,%si
+       call write_si
+       movw $rm16_msg,%si
+       call write_si
+       call init_simple_prot
+in_real_again:
+       movw $rm16_again,%si
+       call write_si
+       jmp kernel_exit
+write_si: 
+       movb (%si),%al
+       cmpb $0x00,%al 
+       je done
+       movb $0x0e,%ah
+       xorw %bx,%bx 
+       int $0x10
+       incw %si
+       jmp write_si
+done:
+	ret
+kernel_exit:
+       hlt
+       jmp kernel_exit
+init_simple_prot:
+	xorl %ebx, %ebx
+	movw %ds, %bx
+	shll $4, %ebx
+	movl %ebx, %eax
+	movw %ax, (gdt2+2)
+	movw %ax, (gdt3+2)
+	movw %ax, (gdt4+2)
+	movw %ax, (gdt5+2)
+	shr $16, %eax
+	movb %al, (gdt2+4)
+	movb %al, (gdt3+4)
+	movb %al, (gdt4+4)
+	movb %al, (gdt5+4)
+	movb %ah, (gdt2+7)
+	movb %ah, (gdt3+7)
+	movb %ah, (gdt4+7)
+	movb %ah, (gdt5+7)
+	addr32 leal gdt(%ebx), %eax	# hmmm?
+	#.code32
+	#leal gdt(%ebx), %eax
+	#.code16
+	movl %eax, (gdtr+2)
+	cli
+	movw $will_try_unreal, %si
+	call write_si
+	xorw %ax, %ax
+	movw %ax, %es
+	movl %es:(0x34), %edx
+	movw %cs, %es:(0x36)
+	leaw trap, %ax
+	movw %ax, %es:(0x34)
+	movl $0xb809a, %ebx
+	.code32
+	movb $'R', %es:(%ebx)	#eventually addr32 here!
+	.code16
+	pushaw
+	movw $check_unreal_done, %si
+	call write_si
+	popaw
+	movw %cs, %ax
+	movw %ax, (RealModeCS)
+	leaw do_rm, %ax
+	movw %ax, (RealModeIP)
+	movw $0xb800, %ax
+	movw %ax, %es
+	lgdt (gdtr)		#powinny byc nawiasy ???
+	movl %cr0, %eax
+	andb $1, %al
+	movl %eax, %cr0
+	pushal
+	movw $partial_prot, %si
+	call write_si
+	popal
+	#ljmp (do_pm+SYS_CODE_SEL)
+	#movw $0x10, %cx
+	#movw %cx, %cs
+	#ljmp do_pm
+	ljmp $do_pm, $do_pm	
+	ret
+trap:
+	movw $0xb800, %ax
+	movw %ax, %fs
+	movb $'!', %fs:(0x9c)
+	popw %ax
+	addw $5, %ax
+	pushw %ax
+	iret
+do_pm:
+	.code32
+	xorl %edi, %edi
+	xorl %esi, %esi
+	leaw code_32, %si
+	movw $326, %di
+	movl $46, %ecx
+	cld
+	rep movsb
+	movw $SYS_DATA_SEL, %ax		#bez nawiasow?
+	movw %ax, %ds
+	movw %ax, %ss
+	movw $LINEAR_SEL, %ax
+	movw %ax, %es
+	movb $'0', %es:(0xb8000)
+	movb $'1', %es:(0xb8002)
+	movb $'2', %es:(0xb8004)
+	movb $'3', %es:(0xb8006)
+	leal now_in_prot, %esi
+	movl $0xb81e8, %edi
+	movl $52, %ecx
+	cld
+	rep movsb
+	ljmp $REAL_CODE_SEL, $do_16
+	ret
+do_16:
+	.code16
+	movw $REAL_DATA_SEL, %ax
+	movw %ax, %ss
+	movw %ax, %ds
+	movl %cr0, %eax
+	andb 0xfe, %al
+	movl %eax, %cr0
+	ljmp *(RealModeIP)
+
+do_rm:
+	.code16
+	.code32
+	movb $'4', %es:(0xb8008)
+	.code16
+	pushaw
+	movw $unreal_mode, %si
+	call write_si
+	popaw
+	xorw %ax, %ax
+	movw %ax, %es
+	.code32
+	movw $'5', %es:(0xb800a)
+	.code16
+	#now addressing 32 bit but code 16 bit!!! but with prefix...
+	leal unreal_color, %esi
+	movl $0xb828a, %edi
+	movl $56, %ecx
+	cld
+	.byte 0x67	# 32bit instructions prefix
+	rep movsb
+	movw %cs, %ax
+	movw %ax, %ds
+	movw %ax, %ss
+	movw $0xb800, %ax
+	movw %ax, %es
+	xorw %ax, %ax
+	movw %ax, %es
+	movl %edx, %es:(0x34)
+	sti
+	jmp in_real_again

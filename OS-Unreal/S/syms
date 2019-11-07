@@ -1,0 +1,8 @@
+#!/bin/sh
+#objdump -D os_unreal.bootimg -b binary -m i386 | less
+make 
+nasm -o pm.com pm.asm
+ndisasm os_unreal.bootimg > pmm2.dis
+ndisasm pm.com > pmm.dis
+diff pmm.dis pmm2.dis
+echo 'OK'

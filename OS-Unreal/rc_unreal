@@ -1,0 +1,28 @@
+romimage: file=/data/bochs/bios/BIOS-bochs-latest, address=0xf0000
+megs: 24
+vgaromimage: /data/bochs/bios/VGABIOS-elpin-2.40
+floppya: 1_44=os_unreal.bootimg, status=inserted
+ata0: enabled=0, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+ata1: enabled=0, ioaddr1=0x170, ioaddr2=0x370, irq=15
+ata2: enabled=0, ioaddr1=0x1e8, ioaddr2=0x3e8, irq=11
+ata3: enabled=0, ioaddr1=0x168, ioaddr2=0x368, irq=9
+boot: floppy
+floppy_bootsig_check: disabled=1
+log: log.out
+panic: action=ask
+error: action=report
+info: action=report
+debug: action=ignore
+debugger_log: debugger.out
+parport1: enabled=1, file="parport.out"
+vga_update_interval: 80000
+keyboard_serial_delay: 250
+keyboard_paste_delay: 100000
+floppy_command_delay: 500
+ips: 50000
+mouse: enabled=0
+private_colormap: enabled=0
+fullscreen: enabled=0
+screenmode: name="sample"
+keyboard_mapping: enabled=0, map=
+i440fxsupport: enabled=0

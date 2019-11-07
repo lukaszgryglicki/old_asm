@@ -1,0 +1,2 @@
+objdump -b binary prot.com -D -m i386
+ld -o prot.com --oformat binary -Ttext 0x0000 prot.o 
